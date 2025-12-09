@@ -23,8 +23,8 @@ def estimate_lipschitz(f, a, b, samples=1000):
 ```python
 def piyavskii_minimize(f, a, b, L, eps=1e-3, max_iter=10000):
     """
-    Реализация алгоритма глобальной оптимизации Пиявского–Шуберта.
-
+    Классическая реализация алгоритма Пиявского-Шуберта.
+    
     f        — функция
     a, b     — границы интервала
     L        — константа Липшица (или её верхняя оценка)
@@ -56,26 +56,31 @@ def piyavskii_minimize(f, a, b, L, eps=1e-3, max_iter=10000):
     while it < max_iter:
         it += 1
 
-        candidates = []
-
+        # Находим интервал с минимальной нижней оценкой
+        min_LB = float('inf')
+        x_star = None
+        interval_idx = None
+        
         for i in range(len(xs) - 1):
             x_i, x_j = xs[i], xs[i+1]
             f_i, f_j = fs[i], fs[i+1]
-
-            # Формула нахождения точки пересечения "конусов"
-            x_c = 0.5 * (x_i + x_j) + (f_j - f_i) / (2 * L)
-
-            # Коррекция: точка должна находиться внутри интервала
-            if x_c <= x_i or x_c >= x_j:
-                x_c = 0.5 * (x_i + x_j)
-
-            # Нижняя граница на интервале
+            
+            # Вычисляем точку пересечения конусов (пик)
+            x_c = 0.5 * (x_i + x_j) - (f_j - f_i) / (2 * L)
+            
+            # Ограничиваем точку интервалом [x_i, x_j]
+            if x_c < x_i:
+                x_c = x_i
+            elif x_c > x_j:
+                x_c = x_j
+                
+            # Вычисляем нижнюю оценку в этой точке
             LB_value = 0.5 * (f_i + f_j - L * (x_j - x_i))
-
-            candidates.append((x_c, LB_value, i))
-
-        # Выбираем интервал с минимальной нижней границей
-        x_star, LB_min, idx = min(candidates, key=lambda t: t[1])
+            
+            if LB_value < min_LB:
+                min_LB = LB_value
+                x_star = x_c
+                interval_idx = i
 
         # Лучшая найденная точка
         best_idx = int(np.argmin(fs))
@@ -83,10 +88,10 @@ def piyavskii_minimize(f, a, b, L, eps=1e-3, max_iter=10000):
         f_best = fs[best_idx]
 
         # Сохраняем историю
-        history.append((xs.copy(), fs.copy(), x_best, f_best, LB_min))
+        history.append((xs.copy(), fs.copy(), x_best, f_best, min_LB))
 
         # Критерий остановки
-        if (f_best - LB_min) <= eps:
+        if (f_best - min_LB) <= eps:
             break
 
         # Вычисляем f(x*) и добавляем новую точку
